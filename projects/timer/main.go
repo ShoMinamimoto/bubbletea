@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/stopwatch"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"os"
+	"time"
 )
 
 /***
@@ -14,9 +16,12 @@ import (
  ***/
 
 type keyMap struct {
-	exampleKey key.Binding
-	help       key.Binding
-	quit       key.Binding
+	exampleKey     key.Binding
+	stopwatchStart key.Binding
+	stopwatchStop  key.Binding
+	stopwatchReset key.Binding
+	help           key.Binding
+	quit           key.Binding
 }
 
 func initKeyMap() *keyMap {
@@ -24,6 +29,19 @@ func initKeyMap() *keyMap {
 		exampleKey: key.NewBinding(
 			key.WithKeys("d"),
 			key.WithHelp("d", "do a thing"),
+		),
+		stopwatchStart: key.NewBinding(
+			key.WithKeys("s"),
+			key.WithHelp("s", "start watch"),
+		),
+		stopwatchStop: key.NewBinding(
+			key.WithKeys("s"),
+			key.WithHelp("s", "stop watch"),
+			key.WithDisabled(),
+		),
+		stopwatchReset: key.NewBinding(
+			key.WithKeys("r"),
+			key.WithHelp("r", "reset watch"),
 		),
 		help: key.NewBinding(
 			key.WithKeys("?"),
@@ -38,14 +56,18 @@ func initKeyMap() *keyMap {
 
 func (k keyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		k.exampleKey,
+		k.stopwatchStart,
+		k.stopwatchStop,
+		k.stopwatchReset,
 		k.help,
+		k.quit,
 	}
 }
 
 func (k keyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{k.exampleKey},
+		{k.stopwatchStart, k.stopwatchStop, k.stopwatchReset},
 		{k.help, k.quit},
 	}
 }
@@ -57,6 +79,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 // model for the entire program
 type model struct {
 	// insert global variables here
+	stopwatch   stopwatch.Model
 	styles      *styles
 	keys        *keyMap
 	help        help.Model
@@ -66,6 +89,7 @@ type model struct {
 // returns a model with default values
 func initialModel() model {
 	return model{
+		stopwatch:   stopwatch.NewWithInterval(time.Second),
 		styles:      initStyles(),
 		keys:        initKeyMap(),
 		help:        help.New(),
@@ -75,7 +99,9 @@ func initialModel() model {
 
 // Init returns a starting command or nil
 func (m model) Init() tea.Cmd {
-	return tea.EnterAltScreen
+	return tea.Batch(
+		tea.EnterAltScreen,
+	)
 }
 
 // Update consumes messages and returns an updated model and command
@@ -92,11 +118,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, m.keys.exampleKey):
 			m.testMessage = "I did a thing!"
+		case key.Matches(msg, m.keys.stopwatchStart, m.keys.stopwatchStop):
+			m.keys.stopwatchStart.SetEnabled(m.stopwatch.Running())
+			m.keys.stopwatchStop.SetEnabled(!m.stopwatch.Running())
+			return m, m.stopwatch.Toggle()
+		case key.Matches(msg, m.keys.stopwatchReset):
+			return m, m.stopwatch.Reset()
 		case key.Matches(msg, m.keys.help):
 			m.help.ShowAll = !m.help.ShowAll
 		case key.Matches(msg, m.keys.quit):
 			return m, tea.Quit
 		}
+
+	case stopwatch.TickMsg, stopwatch.StartStopMsg, stopwatch.ResetMsg:
+		var cmd tea.Cmd
+		m.stopwatch, cmd = m.stopwatch.Update(msg)
+		return m, cmd
 	}
 	return m, nil
 }
@@ -104,16 +141,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View returns a string that contains the entire display
 func (m model) View() string {
 	// render test message
-	testMsg := m.styles.core.Render(m.testMessage)
+	testMsg := m.styles.core.Render(m.testMessage) + "\n"
+	stopwatchView := m.styles.core.Render(m.stopwatch.View()) + "\n"
 
 	// generate Help view
 	helpView := lipgloss.Place(m.styles.appWidth,
-		m.styles.appHeight-lipgloss.Height(testMsg),
+		m.styles.appHeight-lipgloss.Height(testMsg+stopwatchView)+1,
 		lipgloss.Right,
 		lipgloss.Bottom,
 		m.help.View(m.keys))
 
-	return m.styles.app.Render(testMsg + helpView)
+	return m.styles.app.Render(testMsg + stopwatchView + helpView)
 }
 
 /***
