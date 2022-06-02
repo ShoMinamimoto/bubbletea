@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/charmbracelet/bubbles v0.10.3
-	github.com/charmbracelet/lipgloss v0.4.0 // indirect
+	github.com/charmbracelet/lipgloss v0.4.0
 	github.com/containerd/console v1.0.3
 	github.com/mattn/go-isatty v0.0.14
 	github.com/muesli/ansi v0.0.0-20211018074035-2e021307bc4b
