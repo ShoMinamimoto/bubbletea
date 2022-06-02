@@ -7,32 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"os"
-	"strings"
 )
-
-/***
- * Lipgloss
- ***/
-
-type styles struct {
-	app  lipgloss.Style
-	core lipgloss.Style
-}
-
-func initialStyles() *styles {
-	return &styles{
-		app: lipgloss.NewStyle().
-			Padding(1, 2).
-			Margin(1, 2).
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("13")).
-			Height(10),
-
-		core: lipgloss.NewStyle().
-			Width(80).
-			Align(lipgloss.Center),
-	}
-}
 
 /***
  * Key + Help bubbles
@@ -44,7 +19,7 @@ type keyMap struct {
 	quit       key.Binding
 }
 
-func newKeyMap() *keyMap {
+func initKeyMap() *keyMap {
 	return &keyMap{
 		exampleKey: key.NewBinding(
 			key.WithKeys("d"),
@@ -91,8 +66,8 @@ type model struct {
 // returns a model with default values
 func initialModel() model {
 	return model{
-		styles:      initialStyles(),
-		keys:        newKeyMap(),
+		styles:      initStyles(),
+		keys:        initKeyMap(),
 		help:        help.New(),
 		testMessage: "Hello World!",
 	}
@@ -110,10 +85,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// respond to resizing
 	case tea.WindowSizeMsg:
-		width := msg.Width - m.styles.app.GetHorizontalMargins() - m.styles.app.GetHorizontalBorderSize()
-		height := msg.Height - m.styles.app.GetVerticalMargins() - m.styles.app.GetVerticalBorderSize()
-		m.styles.app = m.styles.app.Width(width).Height(height)
-		m.help.Width = width
+		m.styles.Resize(msg.Width, msg.Height)
+		m.help.Width = m.styles.appWidth
 
 	case tea.KeyMsg:
 		switch {
@@ -134,13 +107,13 @@ func (m model) View() string {
 	testMsg := m.styles.core.Render(m.testMessage)
 
 	// generate Help view
-	helpView := m.help.View(m.keys)
-	helpSize := fmt.Sprintf("Help width = %v", lipgloss.Width(helpView))
+	helpView := lipgloss.Place(m.styles.appWidth,
+		m.styles.appHeight-lipgloss.Height(testMsg),
+		lipgloss.Right,
+		lipgloss.Bottom,
+		m.help.View(m.keys))
 
-	// calculate whitespace
-	padding := m.styles.app.GetHeight() - m.styles.app.GetVerticalBorderSize() - lipgloss.Height(testMsg) - lipgloss.Height(helpView)
-
-	return m.styles.app.Render(testMsg + strings.Repeat("\n", padding) + helpSize + helpView)
+	return m.styles.app.Render(testMsg + helpView)
 }
 
 /***
