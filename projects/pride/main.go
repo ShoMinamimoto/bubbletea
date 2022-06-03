@@ -14,20 +14,43 @@ import (
  * Lipgloss
  ***/
 
+var myCuteBorder = lipgloss.Border{
+	Top:         "._.:*:",
+	Bottom:      "._.:*:",
+	Left:        "|*",
+	Right:       "|*",
+	TopLeft:     "*",
+	TopRight:    "*",
+	BottomLeft:  "*",
+	BottomRight: "*",
+}
+
 type styles struct {
-	//TODO: split app style, because Padding and Margins heck everything up
 	app       lipgloss.Style
+	appTop    lipgloss.Style
+	appBottom lipgloss.Style
 	appwidth  int
 	appheight int
 	core      lipgloss.Style
 }
 
 func initStyles() *styles {
+	border := lipgloss.HiddenBorder()
 	return &styles{
 		app: lipgloss.NewStyle().
-			Padding(1, 2).
-			Margin(1, 2).
-			BorderStyle(lipgloss.ThickBorder()),
+			Padding(0, 2).
+			Margin(0, 2).
+			Border(border, false, true),
+
+		appTop: lipgloss.NewStyle().
+			Padding(1, 2, 0).
+			Margin(1, 2, 0).
+			Border(border, true, true, false),
+
+		appBottom: lipgloss.NewStyle().
+			Padding(0, 2, 1).
+			Margin(0, 2, 1).
+			Border(border, false, true, true),
 
 		appwidth:  80,
 		appheight: 24,
@@ -40,10 +63,9 @@ func initStyles() *styles {
 
 func (s *styles) Resize(x, y int) {
 	s.appwidth = x - s.app.GetHorizontalFrameSize()
-	s.appheight = y - s.app.GetVerticalFrameSize()
+	s.appheight = y - s.appTop.GetVerticalFrameSize() - s.appBottom.GetVerticalFrameSize()
 	s.app = s.app.
-		Width(s.appwidth + s.app.GetHorizontalPadding()).
-		Height(s.appheight + s.app.GetVerticalPadding())
+		Width(s.appwidth + s.app.GetHorizontalPadding())
 	s.core = s.core.Width(s.appwidth)
 }
 
@@ -57,24 +79,18 @@ func (s styles) RenderFlag(flag, str string) string {
 		switch index {
 		case 0:
 			next := lines[0 : sectionHeight-1]
-			nextSection = s.app.
-				Border(s.app.GetBorderStyle(), true, true, false).
+			nextSection = s.appTop.
 				BorderBackground(lipgloss.Color(color)).
-				UnsetHeight().
 				Render(strings.Join(next, ""))
 		case len(colors) - 1:
 			next := lines[index*sectionHeight-1:]
-			nextSection = s.app.
-				Border(s.app.GetBorderStyle(), false, true, true).
+			nextSection = s.appBottom.
 				BorderBackground(lipgloss.Color(color)).
-				UnsetHeight().
 				Render(strings.Join(next, ""))
 		default:
 			next := lines[index*sectionHeight-1 : (index+1)*sectionHeight-1]
 			nextSection = s.app.
-				Border(s.app.GetBorderStyle(), false, true).
 				BorderBackground(lipgloss.Color(color)).
-				UnsetHeight().
 				Render(strings.Join(next, ""))
 		}
 		sections = append(sections, nextSection)
