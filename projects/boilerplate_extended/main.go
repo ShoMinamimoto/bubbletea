@@ -7,24 +7,44 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"os"
-	"strings"
 )
 
 /***
  * Lipgloss
  ***/
 
-var (
-	appStyle = lipgloss.NewStyle().
-			Padding(1, 2).
-			MarginBottom(1).
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("13"))
+type styles struct {
+	app         lipgloss.Style
+	innerWidth  int
+	innerHeight int
+	core        lipgloss.Style
+}
 
-	coreStyle = lipgloss.NewStyle().
-			Width(50).
-			Align(lipgloss.Center)
-)
+func initStyles() *styles {
+	app := lipgloss.NewStyle().
+		Padding(1, 2).
+		Margin(1, 2).
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("13"))
+
+	innerWidth := 80 - app.GetHorizontalFrameSize()
+	innerHeight := 24 - app.GetVerticalFrameSize()
+
+	core := lipgloss.NewStyle().Align(lipgloss.Center)
+
+	return &styles{
+		app:         app,
+		innerWidth:  innerWidth,
+		innerHeight: innerHeight,
+		core:        core,
+	}
+}
+
+func (s *styles) Resize(x, y int) {
+	s.innerWidth = x - s.app.GetHorizontalFrameSize()
+	s.innerHeight = y - s.app.GetVerticalFrameSize()
+	s.core = s.core.Width(s.innerWidth)
+}
 
 /***
  * Key + Help bubbles
@@ -36,7 +56,7 @@ type keyMap struct {
 	quit       key.Binding
 }
 
-func newKeyMap() *keyMap {
+func initKeyMap() *keyMap {
 	return &keyMap{
 		exampleKey: key.NewBinding(
 			key.WithKeys("d"),
@@ -74,15 +94,17 @@ func (k keyMap) FullHelp() [][]key.Binding {
 // model for the entire program
 type model struct {
 	// insert global variables here
+	styles      *styles
 	keys        *keyMap
 	help        help.Model
 	testMessage string
 }
 
 // returns a model with default values
-func initialModel() model {
+func initModel() model {
 	return model{
-		keys:        newKeyMap(),
+		styles:      initStyles(),
+		keys:        initKeyMap(),
 		help:        help.New(),
 		testMessage: "Hello World!",
 	}
@@ -90,7 +112,7 @@ func initialModel() model {
 
 // Init returns a starting command or nil
 func (m model) Init() tea.Cmd {
-	return nil
+	return tea.EnterAltScreen
 }
 
 // Update consumes messages and returns an updated model and command
@@ -100,7 +122,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// respond to resizing
 	case tea.WindowSizeMsg:
-		m.help.Width = msg.Width
+		m.styles.Resize(msg.Width, msg.Height)
+		m.help.Width = m.styles.innerWidth
 
 	case tea.KeyMsg:
 		switch {
@@ -117,16 +140,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View returns a string that contains the entire display
 func (m model) View() string {
+	var (
+		sections        []string
+		availableHeight = m.styles.innerHeight
+	)
+
 	// render test message
-	testMsg := coreStyle.Render(m.testMessage)
+	testMsg := m.styles.core.Render(m.testMessage)
+	sections = append(sections, testMsg)
+	availableHeight -= lipgloss.Height(testMsg)
 
 	// generate Help view
-	helpView := m.help.View(m.keys)
+	helpView := lipgloss.Place(
+		m.styles.innerWidth,
+		availableHeight,
+		lipgloss.Right,
+		lipgloss.Bottom,
+		m.help.View(m.keys))
+	sections = append(sections, helpView)
 
-	// calculate whitespace
-	padding := 8 - lipgloss.Height(testMsg) - lipgloss.Height(helpView)
-
-	return appStyle.Render(testMsg + strings.Repeat("\n", padding) + helpView)
+	return m.styles.app.Render(lipgloss.JoinVertical(lipgloss.Left, sections...))
 }
 
 /***
@@ -135,7 +168,7 @@ func (m model) View() string {
 
 // main initializes a model and starts a bubbletea program
 func main() {
-	program := tea.NewProgram(initialModel())
+	program := tea.NewProgram(initModel())
 	if err := program.Start(); err != nil {
 		fmt.Printf("An error has occurred: %v", err)
 		os.Exit(1)
