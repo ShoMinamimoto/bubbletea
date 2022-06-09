@@ -204,8 +204,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// respond to resizing
 	case tea.WindowSizeMsg:
 		m.styles.Resize(msg.Width, msg.Height)
-		m.list.SetSize(m.styles.appWidth, m.styles.appHeight-4)
-		m.help.Width = m.styles.appWidth
+		m.list.SetSize(m.styles.innerWidth, m.styles.innerHeight-4)
+		m.help.Width = m.styles.innerWidth
 
 	case tea.KeyMsg:
 		switch {
@@ -238,7 +238,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View returns a string that contains the entire display
 func (m model) View() string {
-	heightAvailable := m.styles.appHeight
+	heightAvailable := m.styles.innerHeight
 
 	// render messages
 	/*	testMsg := m.styles.core.Render(m.testMessage) + "\n"
@@ -251,14 +251,15 @@ func (m model) View() string {
 	heightAvailable -= lipgloss.Height(listView)
 
 	// generate Help view
-	helpView := lipgloss.Place(m.styles.appWidth,
+	helpView := lipgloss.Place(m.styles.innerWidth,
 		heightAvailable,
 		lipgloss.Right,
 		lipgloss.Bottom,
 		m.help.View(m.keys))
 
-	//return m.styles.app.Render(testMsg + stopwatchView + helpView)
-	return m.styles.app.Render(listView + helpView)
+	fullView := lipgloss.JoinVertical(lipgloss.Left, listView, helpView)
+
+	return m.styles.app.Render(fullView)
 }
 
 /***
