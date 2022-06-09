@@ -177,8 +177,12 @@ func initialModel() model {
 			stopwatch:   stopwatch.NewWithInterval(time.Second),
 		},
 	}
+
+	newList := list.New(items, initItemDelegate(initItemKeyMap()), 60, 15)
+	newList.SetShowHelp(false)
+
 	return model{
-		list:        list.New(items, initItemDelegate(initItemKeyMap()), 60, 15),
+		list:        newList,
 		stopwatch:   stopwatch.NewWithInterval(time.Second),
 		styles:      initStyles(),
 		keys:        initKeyMap(),
