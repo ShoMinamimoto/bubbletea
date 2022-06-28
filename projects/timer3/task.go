@@ -35,62 +35,10 @@ func newTask(i int) Task {
 	}
 }
 
-type TaskStyles struct {
-	NormalLabel   lipgloss.Style
-	NormalTimer   lipgloss.Style
-	SelectedLabel lipgloss.Style
-	SelectedTimer lipgloss.Style
-	ActiveLabel   lipgloss.Style
-	ActiveTimer   lipgloss.Style
-}
-
-func NewTaskStyles() (s TaskStyles) {
-	s.NormalLabel = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#1a1a1a", Dark: "#dddddd"}).
-		Padding(0, 0, 0, 2)
-
-	s.NormalTimer = s.NormalLabel.Copy().Padding(0, 2, 0, 0)
-
-	s.SelectedLabel = lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), false, false, false, true).
-		BorderForeground(lipgloss.AdaptiveColor{Light: "#f792ff", Dark: "#ad58b4"}).
-		Foreground(lipgloss.AdaptiveColor{Light: "#ee6ff8", Dark: "#ee6ff8"}).
-		Padding(0, 0, 0, 1)
-
-	s.SelectedTimer = s.SelectedLabel.Copy().Padding(0, 1, 0, 0).
-		Border(lipgloss.NormalBorder(), false, true, false, false)
-
-	s.ActiveLabel = lipgloss.NewStyle().
-		Foreground(lipgloss.AdaptiveColor{Light: "#6F73F8", Dark: "#6F73F8"}).
-		Padding(0, 0, 0, 2)
-
-	s.ActiveTimer = s.ActiveLabel.Copy().Padding(0, 2, 0, 0)
-
-	return s
-}
-
-type TaskKeyMap struct {
-	start key.Binding
-	stop  key.Binding
-}
-
-func NewTaskKeyMap() *TaskKeyMap {
-	return &TaskKeyMap{
-		start: key.NewBinding(
-			key.WithKeys("s"),
-			key.WithHelp("s", "start timer"),
-		),
-		stop: key.NewBinding(
-			key.WithKeys("s"),
-			key.WithHelp("s", "stop timer"),
-			key.WithDisabled(),
-		),
-	}
-}
-
 type TaskDelegate struct {
 	styles TaskStyles
 	keys   *TaskKeyMap
+	editor Editor
 }
 
 func (t TaskDelegate) ShortHelp() []key.Binding {
@@ -156,18 +104,27 @@ func (t TaskDelegate) Spacing() int {
 }
 
 func (t TaskDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
-	var cmds []tea.Cmd
+	var (
+		cmds    []tea.Cmd
+		running = false
+	)
+
+	if v, ok := m.SelectedItem().(Task); ok {
+		running = v.timer.Running()
+	}
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, t.keys.start, t.keys.stop):
-			t.keys.start.SetEnabled(m.SelectedItem().(Task).timer.Running())
-			t.keys.stop.SetEnabled(!m.SelectedItem().(Task).timer.Running())
+			t.keys.start.SetEnabled(running)
+			t.keys.stop.SetEnabled(!running)
 			cmds = append(cmds, m.SelectedItem().(Task).timer.Toggle())
+		case key.Matches(msg, t.keys.edit):
+			cmds = append(cmds, t.Edit(m.SelectedItem().(Task)))
 		default:
-			t.keys.start.SetEnabled(!m.SelectedItem().(Task).timer.Running())
-			t.keys.stop.SetEnabled(m.SelectedItem().(Task).timer.Running())
+			t.keys.start.SetEnabled(!running)
+			t.keys.stop.SetEnabled(running)
 		}
 	}
 
@@ -179,4 +136,11 @@ func (t TaskDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
 	}
 
 	return tea.Batch(cmds...)
+}
+
+func (t TaskDelegate) Edit(task Task) tea.Cmd {
+	t.editor.Load(task)
+	return func() tea.Msg {
+		return StateMsg{state: taskEdit}
+	}
 }

@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"os"
 )
 
 func main() {
@@ -60,6 +61,7 @@ func (m Model) View() string {
 		lipgloss.Left,
 		lipgloss.Bottom,
 		m.help.View(m.keys),
+		lipgloss.WithWhitespaceChars("Lorem ipsum dolor sit amet consectetur"),
 	)
 	sections = append(sections, helpSection)
 
